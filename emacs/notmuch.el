@@ -818,16 +818,12 @@ non-authors is found, assume that all of the authors match."
 	(setq visible-string
 	      (propertize visible-string
 			  'help-echo (concat "..." invisible-string))))
-      ;; Insert the visible and, if present, invisible author strings.
-      (insert visible-string)
-      (unless (string-empty-p invisible-string)
-	(let ((start (point))
-	      overlay)
-	  (insert invisible-string)
-	  (setq overlay (make-overlay start (point)))
-	  (overlay-put overlay 'invisible 'ellipsis)
-	  (overlay-put overlay 'isearch-open-invisible #'delete-overlay)))
-      (insert padding))))
+      ;; mod by Kevin: don't bother with any invisible author or dynamic padding since
+      ;; this doesn't work with full-width characters. Just truncate the visible string
+      ;; to a fixed width and add some fixed padding.
+      (insert (truncate-string-to-width visible-string 30 nil 32))
+      (insert "        ")
+      )))
 
 (defun notmuch-search-insert-field (field format-string result)
   (cond
