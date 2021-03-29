@@ -836,8 +836,9 @@ non-authors is found, assume that all of the authors match."
 					(plist-get result :total)))
 			'face 'notmuch-search-count)))
    ((string-equal field "subject")
+    ;; mod by Kevin: replace annoying characters that mess up alignment
     (insert (propertize (format format-string
-				(notmuch-sanitize (plist-get result :subject)))
+				(string-replace "】" "]" (string-replace "【" "[" (notmuch-sanitize (plist-get result :subject)))))
 			'face 'notmuch-search-subject)))
    ((string-equal field "authors")
     (notmuch-search-insert-authors
