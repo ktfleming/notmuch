@@ -28,12 +28,7 @@
 VALUE
 notmuch_rb_query_destroy (VALUE self)
 {
-    notmuch_query_t *query;
-
-    Data_Get_Notmuch_Query (self, query);
-
-    notmuch_query_destroy (query);
-    DATA_PTR (self) = NULL;
+    notmuch_rb_object_destroy (self, &notmuch_rb_query_type);
 
     return Qnil;
 }
@@ -142,7 +137,7 @@ notmuch_rb_query_search_threads (VALUE self)
     if (status)
 	notmuch_rb_status_raise (status);
 
-    return Data_Wrap_Struct (notmuch_rb_cThreads, NULL, NULL, threads);
+    return Data_Wrap_Notmuch_Object (notmuch_rb_cThreads, &notmuch_rb_threads_type, threads);
 }
 
 /*
@@ -163,7 +158,7 @@ notmuch_rb_query_search_messages (VALUE self)
     if (status)
 	notmuch_rb_status_raise (status);
 
-    return Data_Wrap_Struct (notmuch_rb_cMessages, NULL, NULL, messages);
+    return Data_Wrap_Notmuch_Object (notmuch_rb_cMessages, &notmuch_rb_messages_type, messages);
 }
 
 /*

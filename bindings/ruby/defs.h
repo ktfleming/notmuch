@@ -55,39 +55,70 @@ extern ID ID_db_mode;
 # define RSTRING_PTR(v) (RSTRING((v))->ptr)
 #endif /* !defined (RSTRING_PTR) */
 
-#define Data_Get_Notmuch_Object(obj, type, message, ptr)	\
-    do {							\
-	Data_Get_Struct ((obj), type, (ptr));			\
-	if (!(ptr))						\
-	rb_raise (rb_eRuntimeError, (message));			\
+extern const rb_data_type_t notmuch_rb_object_type;
+extern const rb_data_type_t notmuch_rb_database_type;
+extern const rb_data_type_t notmuch_rb_directory_type;
+extern const rb_data_type_t notmuch_rb_filenames_type;
+extern const rb_data_type_t notmuch_rb_query_type;
+extern const rb_data_type_t notmuch_rb_threads_type;
+extern const rb_data_type_t notmuch_rb_thread_type;
+extern const rb_data_type_t notmuch_rb_messages_type;
+extern const rb_data_type_t notmuch_rb_message_type;
+extern const rb_data_type_t notmuch_rb_tags_type;
+
+#define Data_Get_Notmuch_Object(obj, type, ptr)					    \
+    do {									    \
+	(ptr) = rb_check_typeddata ((obj), (type));				    \
+	if (RB_UNLIKELY (!(ptr))) {						    \
+	    VALUE cname = rb_class_name (CLASS_OF ((obj)));			    \
+	    rb_raise (rb_eRuntimeError, "%"PRIsVALUE" object destroyed", cname);    \
+	}									    \
     } while (0)
 
+#define Data_Wrap_Notmuch_Object(klass, type, ptr) \
+    TypedData_Wrap_Struct ((klass), (type), (ptr))
+
 #define Data_Get_Notmuch_Database(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_database_t, "database closed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_database_type, (ptr))
 
 #define Data_Get_Notmuch_Directory(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_directory_t, "directory destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_directory_type, (ptr))
 
 #define Data_Get_Notmuch_FileNames(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_filenames_t, "filenames destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_filenames_type, (ptr))
 
 #define Data_Get_Notmuch_Query(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_query_t, "query destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_query_type, (ptr))
 
 #define Data_Get_Notmuch_Threads(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_threads_t, "threads destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_threads_type, (ptr))
 
 #define Data_Get_Notmuch_Messages(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_messages_t, "messages destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_messages_type, (ptr))
 
 #define Data_Get_Notmuch_Thread(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_thread_t, "thread destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_thread_type, (ptr))
 
 #define Data_Get_Notmuch_Message(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_message_t, "message destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_message_type, (ptr))
 
 #define Data_Get_Notmuch_Tags(obj, ptr) \
-    Data_Get_Notmuch_Object ((obj), notmuch_tags_t, "tags destroyed", (ptr))
+    Data_Get_Notmuch_Object ((obj), &notmuch_rb_tags_type, (ptr))
+
+static inline notmuch_status_t
+notmuch_rb_object_destroy (VALUE rb_object, const rb_data_type_t *type)
+{
+    void *nm_object;
+    notmuch_status_t ret;
+
+    Data_Get_Notmuch_Object (rb_object, type, nm_object);
+
+    /* Call the corresponding notmuch_*_destroy function */
+    ret = ((notmuch_status_t (*)(void *)) type->data) (nm_object);
+    DATA_PTR (rb_object) = NULL;
+
+    return ret;
+}
 
 /* status.c */
 void
