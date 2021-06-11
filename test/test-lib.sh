@@ -193,56 +193,53 @@ do
 done
 
 if test -n "$debug"; then
-    print_subtest () {
-	printf " %-4s" "[$((test_count - 1))]"
-    }
+	fmt_subtest () {
+		printf -v $1 " %-4s" "[$((test_count - 1))]"
+	}
 else
-    print_subtest () {
-	true
-    }
+	fmt_subtest () {
+		printf -v $1 ''
+	}
 fi
 
 test -n "$COLORS_WITHOUT_TTY" || [ -t 1 ] || color=
 
-if [ -n "$color" ] && [ "$ORIGINAL_TERM" != 'dumb' ] && (
-		TERM=$ORIGINAL_TERM &&
-		export TERM &&
-		tput bold
-		tput setaf
-		tput sgr0
-	) >/dev/null 2>&1
+if [ -n "$color" ] && [ "$ORIGINAL_TERM" != 'dumb' ] &&
+	tput -T "$ORIGINAL_TERM" -S <<<$'bold\nsetaf\nsgr0\n' >/dev/null 2>&1
 then
 	color=t
 else
 	color=
 fi
 
-if test -n "$color"; then
+if test -n "$color"
+then
+	# _tput run in subshell (``) only
+	_tput () { exec tput -T "$ORIGINAL_TERM" "$@"; }
+	unset BOLD RED GREEN BROWN SGR0
 	say_color () {
-		(
-		TERM=$ORIGINAL_TERM
-		export TERM
 		case "$1" in
-			error) tput bold; tput setaf 1;; # bold red
-			skip)  tput bold; tput setaf 2;; # bold green
-			pass)  tput setaf 2;;            # green
-			info)  tput setaf 3;;            # brown
-			*) test -n "$quiet" && return;;
+			error)	b=${BOLD=`_tput bold`}
+				c=${RED=`_tput setaf 1`}   ;; # bold red
+			skip)	b=${BOLD=`_tput bold`}
+				c=${GREEN=`_tput setaf 2`} ;; # bold green
+			pass)	b= c=${GREEN=`_tput setaf 2`} ;; # green
+			info)	b= c=${BROWN=`_tput setaf 3`} ;; # brown
+			*) b= c=; test -n "$quiet" && return ;;
 		esac
-		shift
-		printf " "
-		printf "$@"
-		tput sgr0
-		print_subtest
-		)
+		f=$2
+		shift 2
+		sgr0=${SGR0=`_tput sgr0`}
+		fmt_subtest st
+		printf " ${b}${c}${f}${sgr0}${st}" "$@"
 	}
 else
 	say_color() {
 		test -z "$1" && test -n "$quiet" && return
-		shift
-		printf " "
-		printf "$@"
-		print_subtest
+		f=$2
+		shift 2
+		fmt_subtest st
+		printf " ${f}${st}" "$@"
 	}
 fi
 
@@ -502,12 +499,16 @@ print(msg.as_string(False))
 ' "$@"
 }
 
+notmuch_debug_sanitize () {
+    grep -v '^D.:'
+}
+
 notmuch_exception_sanitize () {
     perl -pe 's/(A Xapian exception occurred at .*[.]cc?):([0-9]*)/\1:XXX/'
 }
 
 notmuch_search_sanitize () {
-    perl -pe 's/("?thread"?: ?)("?)................("?)/\1\2XXX\3/'
+    notmuch_debug_sanitize | perl -pe 's/("?thread"?: ?)("?)................("?)/\1\2XXX\3/'
 }
 
 notmuch_search_files_sanitize () {
@@ -523,6 +524,7 @@ notmuch_show_sanitize () {
     sed -e "$NOTMUCH_SHOW_FILENAME_SQUELCH"
 }
 notmuch_show_sanitize_all () {
+    notmuch_debug_sanitize | \
     sed \
 	-e 's| filename:.*| filename:XXXXX|' \
 	-e 's| id:[^ ]* | id:XXXXX |' | \
@@ -545,9 +547,10 @@ notmuch_emacs_error_sanitize () {
     shift
     for file in "$@"; do
 	echo "=== $file ==="
-	cat "$file"
+	notmuch_debug_sanitize < "$file"
     done | sed \
-	-e 's/^\[.*\]$/[XXX]/' \
+	-e '/^$/d' \
+	-e '/^\[.*\]$/d' \
 	-e "s|^\(command: \)\{0,1\}/.*/$command|\1YYY/$command|"
 }
 
@@ -562,26 +565,6 @@ notmuch_uuid_sanitize () {
 
 notmuch_built_with_sanitize () {
     sed 's/^built_with[.]\(.*\)=.*$/built_with.\1=something/'
-}
-
-notmuch_passwd_sanitize () {
-    ${NOTMUCH_PYTHON} -c'
-import os, sys, pwd, socket
-
-pw = pwd.getpwuid(os.getuid())
-user = pw.pw_name
-name = pw.pw_gecos.partition(",")[0]
-fqdn = socket.getaddrinfo(socket.gethostname(), 0, 0, socket.SOCK_STREAM, 0, socket.AI_CANONNAME)[0][3]
-
-for l in sys.stdin:
-    if user:
-        l = l.replace(user, "USERNAME")
-    if fqdn:
-        l = l.replace(fqdn, "FQDN").replace(".(none)","")
-    if name:
-        l = l.replace(name, "USER_FULL_NAME")
-    sys.stdout.write(l)
-'
 }
 
 notmuch_config_sanitize () {
@@ -875,15 +858,16 @@ test_when_finished () {
 test_done () {
 	GIT_EXIT_OK=t
 	test_results_dir="$TEST_DIRECTORY/test-results"
-	mkdir -p "$test_results_dir"
+	test -d "$test_results_dir" || mkdir "$test_results_dir"
 	test_results_path="$test_results_dir/$this_test"
 
-	echo "total $test_count" >> $test_results_path
-	echo "success $test_success" >> $test_results_path
-	echo "fixed $test_fixed" >> $test_results_path
-	echo "broken $test_broken" >> $test_results_path
-	echo "failed $test_failure" >> $test_results_path
-	echo "" >> $test_results_path
+	printf %s\\n \
+		"success $test_success" \
+		"fixed $test_fixed" \
+		"broken $test_broken" \
+		"failed $test_failure" \
+		"total $test_count" \
+	    > $test_results_path
 
 	[ -n "$EMACS_SERVER" ] && test_emacs '(kill-emacs)'
 
@@ -913,7 +897,7 @@ test_C () {
     echo "== stdout ==" > OUTPUT.stdout
     echo "== stderr ==" > OUTPUT.stderr
     ./${exec_file} "$@" 1>>OUTPUT.stdout 2>>OUTPUT.stderr
-    notmuch_dir_sanitize OUTPUT.stdout OUTPUT.stderr | notmuch_exception_sanitize > OUTPUT
+    notmuch_dir_sanitize OUTPUT.stdout OUTPUT.stderr | notmuch_exception_sanitize | notmuch_debug_sanitize > OUTPUT
 }
 
 make_shim () {
