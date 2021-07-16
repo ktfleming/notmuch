@@ -326,6 +326,7 @@ then NAME behaves like CMD."
     (define-key map [remap notmuch-mua-new-mail] 'notmuch-tree-new-mail)
     (define-key map [remap notmuch-jump-search]  'notmuch-tree-jump-search)
 
+    (define-key map "o" 'notmuch-tree-toggle-order)
     (define-key map "S" 'notmuch-search-from-tree-current-query)
     (define-key map "U" 'notmuch-unthreaded-from-tree-current-query)
     (define-key map "Z" 'notmuch-tree-from-unthreaded-current-query)
@@ -575,7 +576,7 @@ NOT change the database."
       (with-selected-window notmuch-tree-message-window
 	(let (;; Since we are only displaying one message do not indent.
 	      (notmuch-show-indent-messages-width 0)
-	      (notmuch-show-only-matching-messages t)
+	      (notmuch-show-single-message t)
 	      ;; Ensure that `pop-to-buffer-same-window' uses the
 	      ;; window we want it to use.
 	      (display-buffer-overriding-action
@@ -599,7 +600,9 @@ NOT change the database."
     (when id
       ;; We close the window to kill off un-needed buffers.
       (notmuch-tree-close-message-window)
-      (notmuch-show id))))
+      ;; n-s-s-m is buffer local, so use inner let.
+      (let ((notmuch-show-single-message t))
+	(notmuch-show id)))))
 
 (defun notmuch-tree-show-message (arg)
   "Show the current message.
@@ -749,7 +752,8 @@ nil otherwise."
 			 query-context
 			 target
 			 nil
-			 unthreaded)))
+			 unthreaded
+			 notmuch-search-oldest-first)))
 
 (defun notmuch-tree-thread-top ()
   (when (notmuch-tree-get-message-properties)
@@ -1062,7 +1066,8 @@ Complete list of currently available key bindings:
 	(notmuch-sexp-parse-partial-list 'notmuch-tree-insert-forest-thread
 					 results-buf)))))
 
-(defun notmuch-tree-worker (basic-query &optional query-context target open-target unthreaded)
+(defun notmuch-tree-worker (basic-query &optional query-context target
+					open-target unthreaded oldest-first)
   "Insert the tree view of the search in the current buffer.
 
 This is is a helper function for notmuch-tree. The arguments are
@@ -1070,6 +1075,7 @@ the same as for the function notmuch-tree."
   (interactive)
   (notmuch-tree-mode)
   (add-hook 'post-command-hook #'notmuch-tree-command-hook t t)
+  (setq notmuch-search-oldest-first oldest-first)
   (setq notmuch-tree-unthreaded unthreaded)
   (setq notmuch-tree-basic-query basic-query)
   (setq notmuch-tree-query-context (if (or (string= query-context "")
@@ -1088,6 +1094,7 @@ the same as for the function notmuch-tree."
   (let* ((search-args (concat basic-query
 			      (and query-context
 				   (concat " and (" query-context ")"))))
+	 (sort-arg (if oldest-first "--sort=oldest-first" "--sort=newest-first"))
 	 (message-arg (if unthreaded "--unthreaded" "--entire-thread")))
     (when (equal (car (process-lines notmuch-command "count" search-args)) "0")
       (setq search-args basic-query))
@@ -1095,7 +1102,7 @@ the same as for the function notmuch-tree."
     (let ((proc (notmuch-start-notmuch
 		 "notmuch-tree" (current-buffer) #'notmuch-tree-process-sentinel
 		 "show" "--body=false" "--format=sexp" "--format-version=4"
-		 message-arg search-args))
+		 sort-arg message-arg search-args))
 	  ;; Use a scratch buffer to accumulate partial output.
 	  ;; This buffer will be killed by the sentinel, which
 	  ;; should be called no matter how the process dies.
@@ -1113,8 +1120,17 @@ the same as for the function notmuch-tree."
 	      ")")
     notmuch-tree-basic-query))
 
+(defun notmuch-tree-toggle-order ()
+  "Toggle the current search order.
+
+This command toggles the sort order for the current search. The
+default sort order is defined by `notmuch-search-oldest-first'."
+  (interactive)
+  (setq notmuch-search-oldest-first (not notmuch-search-oldest-first))
+  (notmuch-tree-refresh-view))
+
 (defun notmuch-tree (&optional query query-context target buffer-name
-			       open-target unthreaded parent-buffer)
+			       open-target unthreaded parent-buffer oldest-first)
   "Display threads matching QUERY in tree view.
 
 The arguments are:
@@ -1143,7 +1159,7 @@ The arguments are:
     (pop-to-buffer-same-window buffer))
   ;; Don't track undo information for this buffer
   (setq buffer-undo-list t)
-  (notmuch-tree-worker query query-context target open-target unthreaded)
+  (notmuch-tree-worker query query-context target open-target unthreaded oldest-first)
   (setq notmuch-tree-parent-buffer parent-buffer)
   (setq truncate-lines t))
 

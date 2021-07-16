@@ -318,7 +318,7 @@ notmuch_config_values_valid (notmuch_config_values_t *values)
 const char *
 notmuch_config_values_get (notmuch_config_values_t *values)
 {
-    return talloc_strndup (values, values->iterator, values->tok_len);
+    return talloc_strndup (values->children, values->iterator, values->tok_len);
 }
 
 void
@@ -593,6 +593,8 @@ _notmuch_config_key_to_string (notmuch_config_key_t key)
 	return "user.other_email";
     case NOTMUCH_CONFIG_USER_NAME:
 	return "user.name";
+    case NOTMUCH_CONFIG_AUTOCOMMIT:
+	return "database.autocommit";
     default:
 	return NULL;
     }
@@ -638,6 +640,8 @@ _notmuch_config_default (notmuch_database_t *notmuch, notmuch_config_key_t key)
 	return email;
     case NOTMUCH_CONFIG_NEW_IGNORE:
 	return "";
+    case NOTMUCH_CONFIG_AUTOCOMMIT:
+	return "8000";
     case NOTMUCH_CONFIG_HOOK_DIR:
     case NOTMUCH_CONFIG_BACKUP_DIR:
     case NOTMUCH_CONFIG_OTHER_EMAIL:

@@ -8,12 +8,14 @@ Emacs
 previous behaviour of using notmuch to send mail by default, customize
 `mail-user-agent` to `notmuch-user-agent`.
 
+`notmuch-company` now works in `org-msg`.
+
 Vim
 ---
 
 Respect excluded tags when showing a thread.
 
-Notmuch 0.32.2 (UNRELEASED)
+Notmuch 0.32.2 (2021-06-27)
 ===========================
 
 General
@@ -21,6 +23,11 @@ General
 
 Fix a bug from 2017 that can add duplicate thread-id terms to message
 documents.
+
+CLI
+---
+
+Fix small memory leak in notmuch new.
 
 Emacs
 -----
@@ -60,6 +67,10 @@ Emacs
 
 Restore the dynamically bound variables `tag-changes` and `query` in
 in `notmuch-before-tag-hook` and `notmuch-after-tag-hook`.
+
+Add `notmuch-jump-key` face to fontify keys in `notmuch-jump` and
+related functions.  To ensure backward compatibility, the new face
+inherits from `minibuffer-prompt`.
 
 Notmuch 0.32 (2021-05-02)
 =========================

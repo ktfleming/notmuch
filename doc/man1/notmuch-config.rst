@@ -81,9 +81,20 @@ paths are presumed relative to `$HOME` for items in section
     `backups`.
 
 **database.hook_dir**
-
     Directory containing hooks run by notmuch commands. See
     :any:`notmuch-hooks(5)`.
+
+    History: this configuration value was introduced in notmuch 0.32.
+
+    Default: See HOOKS, below.
+
+**database.autocommit**
+
+    How often to commit transactions to disk. `0` means wait until
+    command completes, otherwise an integer `n` specifies to commit to
+    disk after every `n` completed transactions.
+
+    History: this configuration value was introduced in notmuch 0.33.
 
 **user.name**
     Your full name.
@@ -261,7 +272,7 @@ Notmuch configuration file search order:
    by :envvar:`NOTMUCH_PROFILE` environment variable if set,
    ``$HOME/.notmuch-config`` otherwise.
 
-Hooks
+HOOKS
 -----
 
 Notmuch hook directory search order:
