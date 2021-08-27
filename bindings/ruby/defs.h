@@ -23,6 +23,7 @@
 
 #include <notmuch.h>
 #include <ruby.h>
+#include <talloc.h>
 
 extern VALUE notmuch_rb_cDatabase;
 extern VALUE notmuch_rb_cDirectory;
@@ -66,7 +67,7 @@ extern const rb_data_type_t notmuch_rb_messages_type;
 extern const rb_data_type_t notmuch_rb_message_type;
 extern const rb_data_type_t notmuch_rb_tags_type;
 
-#define Data_Get_Notmuch_Object(obj, type, ptr)					    \
+#define Data_Get_Notmuch_Rb_Object(obj, type, ptr)		    		    \
     do {									    \
 	(ptr) = rb_check_typeddata ((obj), (type));				    \
 	if (RB_UNLIKELY (!(ptr))) {						    \
@@ -75,8 +76,15 @@ extern const rb_data_type_t notmuch_rb_tags_type;
 	}									    \
     } while (0)
 
+#define Data_Get_Notmuch_Object(obj, type, ptr)			\
+    do {							\
+	notmuch_rb_object_t *rb_wrapper;			\
+	Data_Get_Notmuch_Rb_Object ((obj), (type), rb_wrapper);	\
+	(ptr) = rb_wrapper->nm_object;				\
+    } while (0)
+
 #define Data_Wrap_Notmuch_Object(klass, type, ptr) \
-    TypedData_Wrap_Struct ((klass), (type), (ptr))
+    TypedData_Wrap_Struct ((klass), (type), notmuch_rb_object_create ((ptr), "notmuch_rb_object: " __location__))
 
 #define Data_Get_Notmuch_Database(obj, ptr) \
     Data_Get_Notmuch_Object ((obj), &notmuch_rb_database_type, (ptr))
@@ -105,19 +113,40 @@ extern const rb_data_type_t notmuch_rb_tags_type;
 #define Data_Get_Notmuch_Tags(obj, ptr) \
     Data_Get_Notmuch_Object ((obj), &notmuch_rb_tags_type, (ptr))
 
-static inline notmuch_status_t
+typedef struct {
+    void *nm_object;
+} notmuch_rb_object_t;
+
+static inline void *
+notmuch_rb_object_create (void *nm_object, const char *name)
+{
+    notmuch_rb_object_t *rb_wrapper = talloc_named_const (NULL, sizeof (*rb_wrapper), name);
+
+    if (RB_UNLIKELY (!rb_wrapper))
+	return NULL;
+
+    rb_wrapper->nm_object = nm_object;
+    talloc_steal (rb_wrapper, nm_object);
+    return rb_wrapper;
+}
+
+static inline void
+notmuch_rb_object_free (void *rb_wrapper)
+{
+    talloc_free (rb_wrapper);
+}
+
+static inline void
 notmuch_rb_object_destroy (VALUE rb_object, const rb_data_type_t *type)
 {
-    void *nm_object;
-    notmuch_status_t ret;
+    notmuch_rb_object_t *rb_wrapper;
 
-    Data_Get_Notmuch_Object (rb_object, type, nm_object);
+    Data_Get_Notmuch_Rb_Object (rb_object, type, rb_wrapper);
 
     /* Call the corresponding notmuch_*_destroy function */
-    ret = ((notmuch_status_t (*)(void *)) type->data) (nm_object);
+    ((void (*)(void *)) type->data) (rb_wrapper->nm_object);
+    notmuch_rb_object_free (rb_wrapper);
     DATA_PTR (rb_object) = NULL;
-
-    return ret;
 }
 
 /* status.c */
@@ -127,6 +156,9 @@ notmuch_rb_status_raise (notmuch_status_t status);
 /* database.c */
 VALUE
 notmuch_rb_database_alloc (VALUE klass);
+
+VALUE
+notmuch_rb_database_destroy (VALUE self);
 
 VALUE
 notmuch_rb_database_initialize (int argc, VALUE *argv, VALUE klass);

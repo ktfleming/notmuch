@@ -321,10 +321,10 @@ then NAME behaves like CMD."
     ;; These bindings shadow common bindings with variants
     ;; that additionally close the message window.
     (define-key map [remap notmuch-bury-or-kill-this-buffer] 'notmuch-tree-quit)
-    (define-key map [remap notmuch-search]       'notmuch-tree-to-search)
-    (define-key map [remap notmuch-help]         'notmuch-tree-help)
-    (define-key map [remap notmuch-mua-new-mail] 'notmuch-tree-new-mail)
-    (define-key map [remap notmuch-jump-search]  'notmuch-tree-jump-search)
+    (define-key map [remap notmuch-search]        'notmuch-tree-to-search)
+    (define-key map [remap notmuch-help]          'notmuch-tree-help)
+    (define-key map [remap notmuch-mua-new-mail]  'notmuch-tree-new-mail)
+    (define-key map [remap notmuch-jump-search]   'notmuch-tree-jump-search)
 
     (define-key map "o" 'notmuch-tree-toggle-order)
     (define-key map "S" 'notmuch-search-from-tree-current-query)
@@ -349,6 +349,8 @@ then NAME behaves like CMD."
     (define-key map "r" 'notmuch-tree-reply-sender)
     (define-key map "R" 'notmuch-tree-reply)
     (define-key map "V" 'notmuch-tree-view-raw-message)
+    (define-key map "l" 'notmuch-tree-filter)
+    (define-key map "t" 'notmuch-tree-filter-by-tag)
 
     ;; The main tree view bindings
     (define-key map (kbd "RET") 'notmuch-tree-show-message)
@@ -954,7 +956,8 @@ unchanged ADDRESS if parsing fails."
       (goto-char (point-max))
       (forward-line -1)
       (when notmuch-tree-open-target
-	(notmuch-tree-show-message-in)))))
+	(notmuch-tree-show-message-in)
+	(notmuch-tree-command-hook)))))
 
 (defun notmuch-tree-insert-tree (tree depth tree-status first last)
   "Insert the message tree TREE at depth DEPTH in the current thread.
@@ -1001,10 +1004,9 @@ message together with all its descendents."
 
 (defun notmuch-tree-insert-forest-thread (forest-thread)
   "Insert a single complete thread."
-  (let (tree-status)
-    ;; Reset at the start of each main thread.
-    (setq notmuch-tree-previous-subject nil)
-    (notmuch-tree-insert-thread forest-thread 0 tree-status)))
+  ;; Reset at the start of each main thread.
+  (setq notmuch-tree-previous-subject nil)
+  (notmuch-tree-insert-thread forest-thread 0 nil))
 
 (defun notmuch-tree-insert-forest (forest)
   "Insert a forest of threads.
@@ -1101,7 +1103,7 @@ the same as for the function notmuch-tree."
     (notmuch-tag-clear-cache)
     (let ((proc (notmuch-start-notmuch
 		 "notmuch-tree" (current-buffer) #'notmuch-tree-process-sentinel
-		 "show" "--body=false" "--format=sexp" "--format-version=4"
+		 "show" "--body=false" "--format=sexp" "--format-version=5"
 		 sort-arg message-arg search-args))
 	  ;; Use a scratch buffer to accumulate partial output.
 	  ;; This buffer will be killed by the sentinel, which
@@ -1167,6 +1169,40 @@ The arguments are:
 				     open-target)
   (interactive)
   (notmuch-tree query query-context target buffer-name open-target t))
+
+(defun notmuch-tree-filter (query)
+  "Filter or LIMIT the current search results based on an additional query string.
+
+Runs a new tree search matching only messages that match both the
+current search results AND the additional query string provided."
+  (interactive (list (notmuch-read-query "Filter search: ")))
+  (let ((notmuch-show-process-crypto (notmuch-tree--message-process-crypto))
+	(grouped-query (notmuch-group-disjunctive-query-string query))
+	(grouped-original-query (notmuch-group-disjunctive-query-string
+				 (notmuch-tree-get-query))))
+    (notmuch-tree-close-message-window)
+    (notmuch-tree (if (string= grouped-original-query "*")
+		      grouped-query
+		    (concat grouped-original-query " and " grouped-query)))))
+
+(defun notmuch-tree-filter-by-tag (tag)
+  "Filter the current search results based on a single TAG.
+
+Run a new search matching only messages that match the current
+search results and that are also tagged with the given TAG."
+  (interactive
+   (list (notmuch-select-tag-with-completion "Filter by tag: "
+					     notmuch-tree-basic-query)))
+  (let ((notmuch-show-process-crypto (notmuch-tree--message-process-crypto)))
+    (notmuch-tree-close-message-window)
+    (notmuch-tree (concat notmuch-tree-basic-query " and tag:" tag)
+		  notmuch-tree-query-context
+		  nil
+		  nil
+		  nil
+		  notmuch-tree-unthreaded
+		  nil
+		  notmuch-search-oldest-first)))
 
 ;;; _
 

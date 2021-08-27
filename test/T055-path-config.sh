@@ -16,6 +16,7 @@ restore_config () {
     unset DATABASE_PATH
     unset NOTMUCH_PROFILE
     unset XAPIAN_PATH
+    unset MAILDIR
     rm -f "$HOME/mail"
     cp notmuch-config-backup.${test_name} ${NOTMUCH_CONFIG}
 }
@@ -55,6 +56,18 @@ home_mail_config () {
     unset DATABASE_PATH
 }
 
+maildir_env_config () {
+    local dir
+    backup_config
+    dir="${HOME}/env_points_here"
+    ln -s $MAIL_DIR $dir
+    export MAILDIR=$dir
+    notmuch config set database.path
+    notmuch config set database.mail_root
+    XAPIAN_PATH="${MAIL_DIR}/.notmuch/xapian"
+    unset DATABASE_PATH
+}
+
 xdg_config () {
     local dir
     local profile=${1:-default}
@@ -79,7 +92,7 @@ xdg_config () {
     notmuch --config=${CONFIG_PATH} config set database.path
 }
 
-for config in traditional split XDG XDG+profile symlink home_mail; do
+for config in traditional split XDG XDG+profile symlink home_mail maildir_env; do
     #start each set of tests with an known set of messages
     add_email_corpus
 
@@ -105,6 +118,9 @@ for config in traditional split XDG XDG+profile symlink home_mail; do
 	    ;;
 	home_mail)
 	    home_mail_config
+	    ;;
+	maildir_env)
+	    maildir_env_config
 	    ;;
     esac
 
@@ -141,13 +157,13 @@ EOF
     notmuch tag -inbox '*'
     notmuch restore < EXPECTED
     notmuch dump > OUTPUT
-    test_expect_equal_file EXPECTED OUTPUT
+    test_expect_equal_file_nonempty EXPECTED OUTPUT
 
     test_begin_subtest "reindex ($config)"
     notmuch search --output=messages '*' > EXPECTED
     notmuch reindex '*'
     notmuch search --output=messages '*' > OUTPUT
-    test_expect_equal_file EXPECTED OUTPUT
+    test_expect_equal_file_nonempty EXPECTED OUTPUT
 
     test_begin_subtest "use existing database ($config)"
     output=$(notmuch new)
@@ -169,7 +185,7 @@ EOF
     test_begin_subtest "Show a raw message ($config)"
     add_message
     notmuch show --format=raw id:$gen_msg_id > OUTPUT
-    test_expect_equal_file $gen_msg_filename OUTPUT
+    test_expect_equal_file_nonempty $gen_msg_filename OUTPUT
     rm -f $gen_msg_filename
 
     test_begin_subtest "reply ($config)"
@@ -190,6 +206,7 @@ On Tue, 05 Jan 2010 15:43:56 -0000, Sender <sender@example.com> wrote:
 > basic reply test
 EOF
     test_expect_equal_file EXPECTED OUTPUT
+
     test_begin_subtest "insert+search ($config)"
     generate_message \
 	"[subject]=\"insert-subject\"" \
@@ -198,14 +215,13 @@ EOF
     mkdir -p "$MAIL_DIR"/{cur,new,tmp}
     notmuch insert < "$gen_msg_filename"
     cur_msg_filename=$(notmuch search --output=files "subject:insert-subject")
-    test_expect_equal_file "$cur_msg_filename" "$gen_msg_filename"
-
+    test_expect_equal_file_nonempty "$cur_msg_filename" "$gen_msg_filename"
 
     test_begin_subtest "compact+search ($config)"
     notmuch search --output=messages '*' | sort > EXPECTED
     notmuch compact
     notmuch search --output=messages '*' | sort > OUTPUT
-    test_expect_equal_file EXPECTED OUTPUT
+    test_expect_equal_file_nonempty EXPECTED OUTPUT
 
     test_begin_subtest "upgrade backup ($config)"
     features=$(xapian-metadata get $XAPIAN_PATH features | grep -v "^relative directory paths")
@@ -250,11 +266,13 @@ EOF
    test_expect_equal "${output}+${output2}" "${value}+"
 
    test_begin_subtest "Config list ($config)"
-   notmuch config list | notmuch_dir_sanitize | sed -e "s/^database.backup_dir=.*$/database.backup_dir/"  \
-						    -e "s/^database.hook_dir=.*$/database.hook_dir/" \
-						    -e "s/^database.path=.*$/database.path/"  \
-						    -e "s,^database.mail_root=CWD/home/mail,database.mail_root=MAIL_DIR," \
-						    > OUTPUT
+   notmuch config list | notmuch_dir_sanitize | \
+       sed -e "s/^database.backup_dir=.*$/database.backup_dir/"  \
+	   -e "s/^database.hook_dir=.*$/database.hook_dir/" \
+	   -e "s/^database.path=.*$/database.path/"  \
+	   -e "s,^database.mail_root=CWD/home/mail,database.mail_root=MAIL_DIR," \
+	   -e "s,^database.mail_root=CWD/home/env_points_here,database.mail_root=MAIL_DIR," \
+	   > OUTPUT
    cat <<EOF > EXPECTED
 built_with.compact=true
 built_with.field_processor=true

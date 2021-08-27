@@ -402,32 +402,56 @@ test_expect_equal () {
     fi
 }
 
+test_diff_file_ () {
+    local file1 file2 testname basename1 basename2
+    file1="$1"
+    file2="$2"
+    if ! test_skip "$test_subtest_name"
+    then
+	if diff -q "$file1" "$file2" >/dev/null ; then
+	    test_ok_
+	else
+	    testname=$this_test.$test_count
+	    basename1=`basename "$file1"`
+	    basename2=`basename "$file2"`
+	    cp "$file1" "$testname.$basename1"
+	    cp "$file2" "$testname.$basename2"
+	    test_failure_ "$(diff -u "$testname.$basename1" "$testname.$basename2")"
+	fi
+    fi
+}
+
 # Like test_expect_equal, but takes two filenames.
 test_expect_equal_file () {
-	local file1 file2 testname basename1 basename2
-	exec 1>&6 2>&7		# Restore stdout and stderr
-	if [ -z "$inside_subtest" ]; then
-		error "bug in the test script: test_expect_equal_file without test_begin_subtest"
-	fi
-	inside_subtest=
-	test "$#" = 2 ||
+    exec 1>&6 2>&7		# Restore stdout and stderr
+    if [ -z "$inside_subtest" ]; then
+	error "bug in the test script: test_expect_equal_file without test_begin_subtest"
+    fi
+    inside_subtest=
+    test "$#" = 2 ||
 	error "bug in the test script: not 2 parameters to test_expect_equal_file"
 
-	file1="$1"
-	file2="$2"
-	if ! test_skip "$test_subtest_name"
-	then
-		if diff -q "$file1" "$file2" >/dev/null ; then
-			test_ok_
-		else
-			testname=$this_test.$test_count
-			basename1=`basename "$file1"`
-			basename2=`basename "$file2"`
-			cp "$file1" "$testname.$basename1"
-			cp "$file2" "$testname.$basename2"
-			test_failure_ "$(diff -u "$testname.$basename1" "$testname.$basename2")"
-		fi
+    test_diff_file_ "$1" "$2"
+}
+
+# Like test_expect_equal, but takes two filenames. Fails if either is empty
+test_expect_equal_file_nonempty () {
+    exec 1>&6 2>&7		# Restore stdout and stderr
+    if [ -z "$inside_subtest" ]; then
+	error "bug in the test script: test_expect_equal_file_nonempty without test_begin_subtest"
     fi
+    inside_subtest=
+    test "$#" = 2 ||
+	error "bug in the test script: not 2 parameters to test_expect_equal_file_nonempty"
+
+    for file in "$1" "$2"; do
+	if [ ! -s "$file" ]; then
+	    test_failure_ "Missing or zero length file: $file"
+	    return $?
+	fi
+    done
+
+    test_diff_file_ "$1" "$2"
 }
 
 # Like test_expect_equal, but arguments are JSON expressions to be
@@ -861,7 +885,7 @@ test_when_finished () {
 test_done () {
 	GIT_EXIT_OK=t
 	test_results_dir="$TEST_DIRECTORY/test-results"
-	test -d "$test_results_dir" || mkdir "$test_results_dir"
+	mkdir -p "$test_results_dir"
 	test_results_path="$test_results_dir/$this_test"
 
 	printf %s\\n \

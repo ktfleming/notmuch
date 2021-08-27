@@ -48,6 +48,9 @@ ID ID_db_mode;
 
 const rb_data_type_t notmuch_rb_object_type = {
     .wrap_struct_name = "notmuch_object",
+    .function = {
+	.dfree = notmuch_rb_object_free,
+    },
 };
 
 #define define_type(id) \
@@ -55,6 +58,9 @@ const rb_data_type_t notmuch_rb_object_type = {
 	.wrap_struct_name = "notmuch_" #id, \
 	.parent = &notmuch_rb_object_type, \
 	.data = &notmuch_ ## id ## _destroy, \
+	.function = { \
+	    .dfree = notmuch_rb_object_free, \
+	}, \
     }
 
 define_type (database);
@@ -260,6 +266,7 @@ Init_notmuch (void)
     rb_define_alloc_func (notmuch_rb_cDatabase, notmuch_rb_database_alloc);
     rb_define_singleton_method (notmuch_rb_cDatabase, "open", notmuch_rb_database_open, -1); /* in database.c */
     rb_define_method (notmuch_rb_cDatabase, "initialize", notmuch_rb_database_initialize, -1); /* in database.c */
+    rb_define_method (notmuch_rb_cDatabase, "destroy!", notmuch_rb_database_destroy, 0); /* in database.c */
     rb_define_method (notmuch_rb_cDatabase, "close", notmuch_rb_database_close, 0); /* in database.c */
     rb_define_method (notmuch_rb_cDatabase, "path", notmuch_rb_database_path, 0); /* in database.c */
     rb_define_method (notmuch_rb_cDatabase, "version", notmuch_rb_database_version, 0); /* in database.c */
