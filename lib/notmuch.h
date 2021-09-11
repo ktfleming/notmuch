@@ -221,6 +221,10 @@ typedef enum _notmuch_status {
      */
     NOTMUCH_STATUS_DATABASE_EXISTS,
     /**
+     * Syntax error in query
+     */
+    NOTMUCH_STATUS_BAD_QUERY_SYNTAX,
+    /**
      * Not an actual status value. Just a way to find out how many
      * valid status values there are.
      */
@@ -961,6 +965,16 @@ notmuch_query_t *
 notmuch_query_create (notmuch_database_t *database,
 		      const char *query_string);
 
+typedef enum {
+    NOTMUCH_QUERY_SYNTAX_XAPIAN,
+    NOTMUCH_QUERY_SYNTAX_SEXP
+} notmuch_query_syntax_t;
+
+notmuch_status_t
+notmuch_query_create_with_syntax (notmuch_database_t *database,
+				  const char *query_string,
+				  notmuch_query_syntax_t syntax,
+				  notmuch_query_t **output);
 /**
  * Sort values for notmuch_query_set_sort.
  */

@@ -1,10 +1,20 @@
-Notmuch 0.33 (UNRELEASED)
+Notmuch 0.33.1 (2021-09-10)
+===========================
+
+General
+-------
+
+Replace the fully-qualified-domain-name of the host with "localhost"
+in the default email address.  This should fix two flaky subtests in
+T590-libconfig.
+
+Notmuch 0.33 (2021-09-03)
 =========================
 
 Library
 -------
 
-Correct documentatation about transactions.
+Correct documentation about transactions.
 
 Add a configurable automatic commit of transactions. See
 `database.autocommit` in notmuch-config(1).
@@ -28,10 +38,36 @@ previous behaviour of using notmuch to send mail by default, customize
 
 Improve the display of messages from long threads in unthreaded mode.
 
+Prefer email addresses over User ID when showing valid signatures.
+
+Define a new face `notmuch-jump-key`.
+
+New commands in notmuch-tree view: `notmuch-tree-filter` and `notmuch-tree-filter-by-tag`.
+
+Honour `notmuch-show-text/html-blocked-images` when using `w3m` to
+render html.
+
+Support toggling sort order in notmuch-tree mode.
+
+Ruby
+----
+
+Memory management of allocated notmuch objects (database, messages,
+etc...) is now done via the Ruby GC. This removes all constraints on
+the order of object destruction.  Database close and destroy are
+split, following an old library API change.
+
 Vim
 ---
 
 Respect excluded tags when showing a thread.
+
+Documentation
+-------------
+
+Fix doc build for Sphinx 4.0.
+
+Improve the markup and linking of the documentation.
 
 Notmuch 0.32.3 (2021-08-17)
 ===========================
@@ -147,7 +183,7 @@ notmuch_database_remove_message or notmuch_message_delete in one
 session has been fixed.
 
 As always, the canonical source of API documentation is
-`lib/notmuch.h`, or the doxygen formatted documentation in `notmuch(3)`
+`lib/notmuch.h`, or the doxygen formatted documentation in `notmuch(3)`.
 
 CLI
 ---
@@ -213,12 +249,12 @@ Fix for exclude tags in notmuch2 bindings.
 Build
 -----
 
-Portability update for T360-symbol-hiding
+Portability update for T360-symbol-hiding.
 
 Library
 -------
 
-Fix for memory error in notmuch_database_get_config_list
+Fix for memory error in notmuch_database_get_config_list.
 
 Notmuch 0.31.2 (2020-11-08)
 ===========================
@@ -433,7 +469,7 @@ Command Line Interface
 ----------------------
 
 `notmuch show` now supports --body=false and --include-html with
---format=text
+--format=text.
 
 Fix several performance problems with `notmuch reindex`.
 
