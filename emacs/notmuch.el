@@ -825,8 +825,7 @@ non-authors is found, assume that all of the authors match."
       ;; this doesn't work with full-width characters. Just truncate the visible string
       ;; to a fixed width and add some fixed padding.
       (insert (truncate-string-to-width visible-string 30 nil 32))
-      (insert "        ")
-      )))
+      (insert "        "))))
 
 (defun notmuch-search-insert-field (field format-string result)
   (pcase field
