@@ -1168,4 +1168,10 @@ This text added by the hook.
 EOF
 test_expect_equal_file EXPECTED OUTPUT
 
+test_begin_subtest "notmuch-search with nonexistent CWD"
+test_emacs '(test-log-error
+	      (let ((default-directory "/nonexistent"))
+	        (notmuch-search "*")))'
+test_expect_equal "$(cat MESSAGES)" "COMPLETE"
+
 test_done
