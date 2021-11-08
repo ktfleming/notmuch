@@ -19,9 +19,8 @@ notmuch_database_open (const char *path,
     char *status_string = NULL;
     notmuch_status_t status;
 
-    status = notmuch_database_open_verbose (path, mode, database,
-					    &status_string);
-
+    status = notmuch_database_open_with_config (path, mode, "", NULL,
+						database, &status_string);
     if (status_string) {
 	fputs (status_string, stderr);
 	free (status_string);
@@ -396,8 +395,6 @@ _finish_open (notmuch_database_t *notmuch,
 				     "       has a newer database format version (%u) than supported by this\n"
 				     "       version of notmuch (%u).\n",
 				     database_path, version, NOTMUCH_DATABASE_VERSION));
-	    notmuch_database_destroy (notmuch);
-	    notmuch = NULL;
 	    status = NOTMUCH_STATUS_FILE_ERROR;
 	    goto DONE;
 	}
@@ -414,8 +411,6 @@ _finish_open (notmuch_database_t *notmuch,
 				     "       requires features (%s)\n"
 				     "       not supported by this version of notmuch.\n",
 				     database_path, incompat_features));
-	    notmuch_database_destroy (notmuch);
-	    notmuch = NULL;
 	    status = NOTMUCH_STATUS_FILE_ERROR;
 	    goto DONE;
 	}
@@ -489,8 +484,6 @@ _finish_open (notmuch_database_t *notmuch,
     } catch (const Xapian::Error &error) {
 	IGNORE_RESULT (asprintf (&message, "A Xapian exception occurred opening database: %s\n",
 				 error.get_msg ().c_str ()));
-	notmuch_database_destroy (notmuch);
-	notmuch = NULL;
 	status = NOTMUCH_STATUS_XAPIAN_EXCEPTION;
     }
   DONE:
@@ -559,10 +552,13 @@ notmuch_database_open_with_config (const char *database_path,
 	    free (message);
     }
 
+    if (status && notmuch) {
+	notmuch_database_destroy (notmuch);
+	notmuch = NULL;
+    }
+
     if (database)
 	*database = notmuch;
-    else
-	talloc_free (notmuch);
 
     if (notmuch)
 	notmuch->open = true;
@@ -717,10 +713,16 @@ notmuch_database_create_with_config (const char *database_path,
 	else
 	    free (message);
     }
+    if (status && notmuch) {
+	notmuch_database_destroy (notmuch);
+	notmuch = NULL;
+    }
+
     if (database)
 	*database = notmuch;
-    else
-	talloc_free (notmuch);
+
+    if (notmuch)
+	notmuch->open = true;
     return status;
 }
 
@@ -867,6 +869,13 @@ notmuch_database_load_config (const char *database_path,
 
     if (status_string)
 	*status_string = message;
+
+    if (status &&
+	status != NOTMUCH_STATUS_NO_DATABASE
+	&& status != NOTMUCH_STATUS_NO_CONFIG) {
+	notmuch_database_destroy (notmuch);
+	notmuch = NULL;
+    }
 
     if (database)
 	*database = notmuch;
