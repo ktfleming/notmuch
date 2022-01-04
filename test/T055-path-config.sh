@@ -277,7 +277,7 @@ EOF
 built_with.compact=something
 built_with.field_processor=something
 built_with.retry_lock=something
-built_with.sexpr_query=something
+built_with.sexp_queries=something
 database.autocommit=8000
 database.backup_dir
 database.hook_dir
@@ -306,7 +306,30 @@ EOF
 	   output2=$(notmuch --config='' config get ${key})
 	   notmuch config set ${key}
 	   test_expect_equal "${output}+${output2}" "${value}+"
+	   ;&
+       split)
+	   test_begin_subtest "'to' header does not crash (python-cffi) ($config)"
+	   echo 'notmuch@notmuchmail.org' > EXPECTED
+	   test_python <<EOF
+from notmuch2 import Database
+db=Database(config=Database.CONFIG.SEARCH)
+m=db.find('20091117232137.GA7669@griffis1.net')
+to=m.header('To')
+print(to)
+EOF
+	   test_expect_equal_file EXPECTED OUTPUT
 	   ;;
+       *)
+	   backup_database
+	   test_begin_subtest ".notmuch without xapian/ handled gracefully ($config)"
+	   rm -r $XAPIAN_PATH
+	   test_expect_success "notmuch new"
+	   restore_database
+	   ;;
+   esac
+
+   case $config in
+       split|XDG*)
    esac
    restore_config
    rm -rf home/.local

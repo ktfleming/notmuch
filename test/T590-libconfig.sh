@@ -23,8 +23,6 @@ EOF
 }
 
 cat <<EOF > c_head
-#include <string.h>
-#include <stdlib.h>
 #include <notmuch-test.h>
 
 int main (int argc, char** argv)
@@ -267,6 +265,29 @@ cat <<'EOF' >EXPECTED
 a
 b
 c
+== stderr ==
+EOF
+test_expect_equal_file EXPECTED OUTPUT
+restore_database
+
+test_begin_subtest "notmuch_config_get_values (ignore leading/trailing whitespace)"
+cat c_head - c_tail <<'EOF' | test_C ${MAIL_DIR} ${NOTMUCH_CONFIG} %NULL%
+{
+    notmuch_config_values_t *values;
+    EXPECT0(notmuch_config_set (db, NOTMUCH_CONFIG_NEW_TAGS, " a ; b c ; d "));
+    for (values = notmuch_config_get_values (db, NOTMUCH_CONFIG_NEW_TAGS);
+	 notmuch_config_values_valid (values);
+	 notmuch_config_values_move_to_next (values))
+    {
+	  puts (notmuch_config_values_get (values));
+    }
+}
+EOF
+cat <<'EOF' >EXPECTED
+== stdout ==
+a
+b c
+d
 == stderr ==
 EOF
 test_expect_equal_file EXPECTED OUTPUT
@@ -616,8 +637,6 @@ cp notmuch-config.bak notmuch-config
 test_expect_equal_file EXPECTED OUTPUT
 
 cat <<EOF > c_head2
-#include <string.h>
-#include <stdlib.h>
 #include <notmuch-test.h>
 
 int main (int argc, char** argv)
@@ -876,13 +895,13 @@ test_expect_equal_file EXPECTED OUTPUT
 
 test_begin_subtest "open: database set to null on missing config (env)"
 old_NOTMUCH_CONFIG=${NOTMUCH_CONFIG}
-NOTMUCH_CONFIG="/nonexistent"
+export NOTMUCH_CONFIG="/nonexistent"
 cat c_head3 - c_tail3 <<'EOF' | test_C ${MAIL_DIR}
   notmuch_status_t st = notmuch_database_open_with_config(argv[1],
 							  NOTMUCH_DATABASE_MODE_READ_ONLY,
 							  NULL, NULL, &db, NULL);
 EOF
-NOTMUCH_CONFIG=${old_NOTMUCH_CONFIG}
+export NOTMUCH_CONFIG=${old_NOTMUCH_CONFIG}
 cat <<EOF> EXPECTED
 == stdout ==
 db == NULL: 1
@@ -903,12 +922,12 @@ test_expect_equal_file EXPECTED OUTPUT
 
 test_begin_subtest "create: database set to null on missing config (env)"
 old_NOTMUCH_CONFIG=${NOTMUCH_CONFIG}
-NOTMUCH_CONFIG="/nonexistent"
+export NOTMUCH_CONFIG="/nonexistent"
 cat c_head3 - c_tail3 <<'EOF' | test_C ${MAIL_DIR}
   notmuch_status_t st = notmuch_database_create_with_config(argv[1],
 							  NULL, NULL, &db, NULL);
 EOF
-NOTMUCH_CONFIG=${old_NOTMUCH_CONFIG}
+export NOTMUCH_CONFIG=${old_NOTMUCH_CONFIG}
 cat <<EOF> EXPECTED
 == stdout ==
 db == NULL: 1
@@ -929,11 +948,11 @@ test_expect_equal_file EXPECTED OUTPUT
 
 test_begin_subtest "load_config: database non-null on missing config (env)"
 old_NOTMUCH_CONFIG=${NOTMUCH_CONFIG}
-NOTMUCH_CONFIG="/nonexistent"
+export NOTMUCH_CONFIG="/nonexistent"
 cat c_head3 - c_tail3 <<'EOF' | test_C ${MAIL_DIR}
   notmuch_status_t st = notmuch_database_load_config(argv[1], NULL, NULL, &db, NULL);
 EOF
-NOTMUCH_CONFIG=${old_NOTMUCH_CONFIG}
+export NOTMUCH_CONFIG=${old_NOTMUCH_CONFIG}
 cat <<EOF> EXPECTED
 == stdout ==
 db == NULL: 0
@@ -951,5 +970,26 @@ db == NULL: 1
 == stderr ==
 EOF
 test_expect_equal_file EXPECTED OUTPUT
+
+test_begin_subtest "open: database parameter overrides implicit config"
+notmuch config set database.path ${MAIL_DIR}/nonexistent
+cat c_head3 - c_tail3 <<'EOF' | test_C ${MAIL_DIR}
+  const char *path = NULL;
+  notmuch_status_t st = notmuch_database_open_with_config(argv[1],
+							  NOTMUCH_DATABASE_MODE_READ_ONLY,
+							  NULL, NULL, &db, NULL);
+  printf ("status: %d\n", st);
+  path = notmuch_database_get_path (db);
+  printf ("path: %s\n", path ? path : "(null)");
+EOF
+cat <<EOF> EXPECTED
+== stdout ==
+status: 0
+path: MAIL_DIR
+db == NULL: 0
+== stderr ==
+EOF
+notmuch_dir_sanitize < OUTPUT > OUTPUT.clean
+test_expect_equal_file EXPECTED OUTPUT.clean
 
 test_done

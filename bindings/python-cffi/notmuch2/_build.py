@@ -1,5 +1,5 @@
 import cffi
-
+from _notmuch_config import *
 
 ffibuilder = cffi.FFI()
 ffibuilder.set_source(
@@ -16,8 +16,8 @@ ffibuilder.set_source(
         #ERROR libnotmuch  version < 5.1 not supported
     #endif
     """,
-    include_dirs=['../../lib'],
-    library_dirs=['../../lib'],
+    include_dirs=[NOTMUCH_INCLUDE_DIR],
+    library_dirs=[NOTMUCH_LIB_DIR],
     libraries=['notmuch'],
 )
 ffibuilder.cdef(
@@ -103,20 +103,18 @@ ffibuilder.cdef(
     notmuch_status_to_string (notmuch_status_t status);
 
     notmuch_status_t
-    notmuch_database_create_verbose (const char *path,
-                                     notmuch_database_t **database,
-                                     char **error_message);
+    notmuch_database_create_with_config (const char *database_path,
+                                         const char *config_path,
+                                         const char *profile,
+                                         notmuch_database_t **database,
+                                         char **error_message);
     notmuch_status_t
-    notmuch_database_create (const char *path, notmuch_database_t **database);
-    notmuch_status_t
-    notmuch_database_open_verbose (const char *path,
-                                   notmuch_database_mode_t mode,
-                                   notmuch_database_t **database,
-                                   char **error_message);
-    notmuch_status_t
-    notmuch_database_open (const char *path,
-                           notmuch_database_mode_t mode,
-                           notmuch_database_t **database);
+    notmuch_database_open_with_config (const char *database_path,
+                                       notmuch_database_mode_t mode,
+                                       const char *config_path,
+                                       const char *profile,
+                                       notmuch_database_t **database,
+                                       char **error_message);
     notmuch_status_t
     notmuch_database_close (notmuch_database_t *database);
     notmuch_status_t

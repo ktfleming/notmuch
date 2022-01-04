@@ -198,7 +198,7 @@ fields of the search."
 (defvar notmuch-hello-indent 4
   "How much to indent non-headers.")
 
-(defimage notmuch-hello-logo ((:type png :file "notmuch-logo.png")))
+(defimage notmuch-hello-logo ((:type svg :file "notmuch-logo.svg")))
 
 (defcustom notmuch-show-logo t
   "Should the notmuch logo be shown?"
@@ -702,7 +702,6 @@ with `notmuch-hello-query-counts'."
   ;; that when we modify map it does not modify widget-keymap).
   (let ((map (make-composed-keymap (list (make-sparse-keymap) widget-keymap))))
     (set-keymap-parent map notmuch-common-keymap)
-    (define-key map (kbd "<C-tab>") 'widget-backward)
     map)
   "Keymap for \"notmuch hello\" buffers.")
 

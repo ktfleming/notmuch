@@ -198,7 +198,7 @@ _choose_database_path (void *ctx,
     }
 
     if (! *database_path && key_file) {
-	char *path = g_key_file_get_value (key_file, "database", "path", NULL);
+	char *path = g_key_file_get_string (key_file, "database", "path", NULL);
 	if (path) {
 	    if (path[0] == '/')
 		*database_path = talloc_strdup (ctx, path);
@@ -246,7 +246,7 @@ _choose_database_path (void *ctx,
 }
 
 static notmuch_database_t *
-_alloc_notmuch ()
+_alloc_notmuch (const char *database_path, const char *config_path, const char *profile)
 {
     notmuch_database_t *notmuch;
 
@@ -262,6 +262,15 @@ _alloc_notmuch ()
     notmuch->transaction_count = 0;
     notmuch->transaction_threshold = 0;
     notmuch->view = 1;
+
+    notmuch->params = NOTMUCH_PARAM_NONE;
+    if (database_path)
+	notmuch->params |= NOTMUCH_PARAM_DATABASE;
+    if (config_path)
+	notmuch->params |= NOTMUCH_PARAM_CONFIG;
+    if (profile)
+	notmuch->params |= NOTMUCH_PARAM_PROFILE;
+
     return notmuch;
 }
 
@@ -509,7 +518,7 @@ notmuch_database_open_with_config (const char *database_path,
 
     _notmuch_init ();
 
-    notmuch = _alloc_notmuch ();
+    notmuch = _alloc_notmuch (database_path, config_path, profile);
     if (! notmuch) {
 	status = NOTMUCH_STATUS_OUT_OF_MEMORY;
 	goto DONE;
@@ -609,7 +618,7 @@ notmuch_database_create_with_config (const char *database_path,
 
     _notmuch_init ();
 
-    notmuch = _alloc_notmuch ();
+    notmuch = _alloc_notmuch (database_path, config_path, profile);
     if (! notmuch) {
 	status = NOTMUCH_STATUS_OUT_OF_MEMORY;
 	goto DONE;
@@ -633,7 +642,7 @@ notmuch_database_create_with_config (const char *database_path,
 
     if (key_file && ! split) {
 	char *mail_root = notmuch_canonicalize_file_name (
-	    g_key_file_get_value (key_file, "database", "mail_root", NULL));
+	    g_key_file_get_string (key_file, "database", "mail_root", NULL));
 	char *db_path = notmuch_canonicalize_file_name (database_path);
 
 	split = (mail_root && (0 != strcmp (mail_root, db_path)));
@@ -652,16 +661,12 @@ notmuch_database_create_with_config (const char *database_path,
 
 	err = mkdir (notmuch_path, 0755);
 	if (err) {
-	    if (errno == EEXIST) {
-		status = NOTMUCH_STATUS_DATABASE_EXISTS;
-		talloc_free (notmuch);
-		notmuch = NULL;
-	    } else {
+	    if (errno != EEXIST) {
 		IGNORE_RESULT (asprintf (&message, "Error: Cannot create directory %s: %s.\n",
 					 notmuch_path, strerror (errno)));
 		status = NOTMUCH_STATUS_FILE_ERROR;
+		goto DONE;
 	    }
-	    goto DONE;
 	}
     }
 
@@ -811,7 +816,7 @@ notmuch_database_load_config (const char *database_path,
 
     _notmuch_init ();
 
-    notmuch = _alloc_notmuch ();
+    notmuch = _alloc_notmuch (database_path, config_path, profile);
     if (! notmuch) {
 	status = NOTMUCH_STATUS_OUT_OF_MEMORY;
 	goto DONE;
